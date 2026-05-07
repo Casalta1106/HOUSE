@@ -382,6 +382,22 @@
   .ia-dot:nth-child(3) { animation-delay: 0.4s; }
   @keyframes ia-bounce { 0%,80%,100% { transform: scale(0.6); opacity:0.4; } 40% { transform: scale(1); opacity:1; } }
 
+  /* ── IA KEY MODAL ── */
+  .iakey-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 1300; opacity: 0; pointer-events: none; transition: opacity 0.2s; display: flex; align-items: flex-end; }
+  .iakey-overlay.open { opacity: 1; pointer-events: all; }
+  .iakey-modal { background: var(--bg2); border: 1px solid var(--border2); border-radius: 20px 20px 0 0; padding: 22px 18px 36px; width: 100%; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); padding-bottom: max(36px, env(safe-area-inset-bottom)); }
+  .iakey-overlay.open .iakey-modal { transform: translateY(0); }
+  .iakey-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+  .iakey-desc { font-size: 12px; color: var(--text3); margin-bottom: 14px; line-height: 1.5; }
+  .iakey-desc a { color: var(--blue); text-decoration: none; }
+  .iakey-input { width: 100%; background: var(--bg3); border: 1px solid var(--border2); border-radius: 10px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px; padding: 12px 13px; outline: none; -webkit-appearance: none; transition: border-color 0.15s; }
+  .iakey-input:focus { border-color: var(--blue); }
+  .iakey-footer { display: flex; gap: 10px; margin-top: 12px; }
+  .iakey-cancel { flex: 1; padding: 13px; background: transparent; border: 1px solid var(--border2); border-radius: 12px; color: var(--text2); cursor: pointer; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; }
+  .iakey-save { flex: 2; padding: 13px; background: var(--blue); border: none; border-radius: 12px; color: #fff; cursor: pointer; font-family: 'Syne', sans-serif; font-weight: 800; font-size: 14px; }
+  .iakey-save:active { opacity: 0.85; transform: scale(0.97); }
+  .iakey-reset { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; text-align: center; margin-top: 10px; cursor: pointer; text-decoration: underline; }
+
   /* ── TOP 5 GASTOS ── */
   .top5-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
   .top5-item:last-child { border-bottom: none; }
@@ -538,7 +554,10 @@
         <div class="score-breakdown" id="scoreBreakdown"></div>
       </div>
       <div style="margin-top:12px">
-        <button class="ia-btn" id="iaBtn" onclick="analisarComIA()">✨ Analisar com IA</button>
+        <div style="display:flex;gap:8px">
+          <button class="ia-btn" id="iaBtn" onclick="analisarComIA()" style="flex:1">✨ Analisar com IA</button>
+          <button onclick="iakeyOpen(function(k){iaSetKey(k);toast('Chave atualizada ✓','success');})" title="Trocar chave" style="width:40px;flex-shrink:0;border-radius:12px;border:1px solid rgba(91,156,246,0.3);background:rgba(91,156,246,0.07);color:var(--blue);font-size:16px;cursor:pointer;touch-action:manipulation;">🔑</button>
+        </div>
         <div id="iaResult"></div>
       </div>
     </div>
@@ -1860,9 +1879,22 @@ function renderScore() {
 }
 
 // ── ANÁLISE COM IA (ideia 14) ──
+function iaGetKey(){return localStorage.getItem('house_ia_key')||'';}
+function iaSetKey(k){if(k)localStorage.setItem('house_ia_key',k.trim());else localStorage.removeItem('house_ia_key');}
+
 async function analisarComIA() {
+  const apiKey = iaGetKey();
+  if (!apiKey) {
+    iakeyOpen(function(key){ _rodarAnaliseIA(key); });
+    return;
+  }
+  _rodarAnaliseIA(apiKey);
+}
+
+async function _rodarAnaliseIA(apiKey) {
   const btn = document.getElementById('iaBtn');
   const result = document.getElementById('iaResult');
+
   btn.disabled = true;
   btn.textContent = '✨ Analisando...';
   result.innerHTML = '<div class="ia-typing"><div class="ia-dot"></div><div class="ia-dot"></div><div class="ia-dot"></div></div>';
@@ -1888,16 +1920,38 @@ Forneça em 3-4 parágrafos curtos:
 
 Seja direto, use dados concretos, e fale de forma amigável como um consultor pessoal.`;
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:1000, messages:[{role:'user',content:prompt}] })
-    });
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey.trim()
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 1000 }
+        })
+      }
+    );
+    if (!resp.ok) {
+      const err = await resp.json().catch(()=>({}));
+      if (resp.status === 400 || resp.status === 403) {
+        iaSetKey(''); // Limpa chave inválida
+        result.innerHTML = `<div class="ia-result" style="border-color:var(--red);color:var(--red)">❌ Chave de API inválida. Clique novamente para inserir uma nova chave.</div>`;
+      } else {
+        const msg = err?.error?.message || 'Tente novamente.';
+        result.innerHTML = `<div class="ia-result" style="border-color:var(--red);color:var(--red)">❌ Erro ${resp.status}: ${msg}</div>`;
+      }
+      btn.disabled = false;
+      btn.innerHTML = '✨ Analisar com IA';
+      return;
+    }
     const data = await resp.json();
-    const text = data.content?.map(c=>c.text||'').join('') || 'Erro ao obter resposta.';
+    const text = data.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('') || 'Erro ao obter resposta.';
     result.innerHTML = `<div class="ia-result">${text}</div>`;
   } catch(e) {
-    result.innerHTML = `<div class="ia-result" style="border-color:var(--red);color:var(--red)">Erro de conexão. Verifique sua internet e tente novamente.</div>`;
+    result.innerHTML = `<div class="ia-result" style="border-color:var(--red);color:var(--red)">❌ Erro de rede. Verifique sua conexão e tente novamente.<br><small style="opacity:0.7">${e.message||''}</small></div>`;
   }
   btn.disabled = false;
   btn.innerHTML = '✨ Analisar novamente';
@@ -2430,5 +2484,56 @@ render();
   }
 })();
 </script>
+
+<!-- IA KEY MODAL -->
+<div class="iakey-overlay" id="iakeyOverlay">
+  <div class="iakey-modal">
+    <div class="modal-handle"></div>
+    <div class="iakey-title">🔑 Chave da API Google Gemini</div>
+    <div class="iakey-desc">Cole sua chave abaixo. Ela fica salva só no seu dispositivo.<br>Obtenha <strong>grátis</strong> em: <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a> → Get API Key</div>
+    <input class="iakey-input" id="iakeyInput" type="password" placeholder="AIza..." autocomplete="off" autocorrect="off" spellcheck="false">
+    <div class="iakey-footer">
+      <button class="iakey-cancel" onclick="iakeyClose()">Cancelar</button>
+      <button class="iakey-save" onclick="iakeyConfirm()">Salvar e analisar</button>
+    </div>
+    <div class="iakey-reset" onclick="iakeyReset()">Limpar chave salva</div>
+  </div>
+</div>
+
+<script>
+// ── IA KEY MODAL CONTROLLER ──
+let _iakeyCallback = null;
+
+function iakeyOpen(callback) {
+  _iakeyCallback = callback;
+  const existing = iaGetKey();
+  document.getElementById('iakeyInput').value = existing || '';
+  document.getElementById('iakeyOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('iakeyInput').focus(), 350);
+}
+function iakeyClose() {
+  document.getElementById('iakeyOverlay').classList.remove('open');
+  _iakeyCallback = null;
+}
+function iakeyConfirm() {
+  const val = document.getElementById('iakeyInput').value.trim();
+  if (!val) { document.getElementById('iakeyInput').style.borderColor = 'var(--red)'; return; }
+  iaSetKey(val);
+  iakeyClose();
+  if (_iakeyCallback) _iakeyCallback(val);
+}
+function iakeyReset() {
+  iaSetKey('');
+  document.getElementById('iakeyInput').value = '';
+  document.getElementById('iakeyInput').focus();
+}
+document.getElementById('iakeyOverlay').addEventListener('click', function(e) {
+  if (e.target === this) iakeyClose();
+});
+document.getElementById('iakeyInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') iakeyConfirm();
+});
+</script>
+
 </body>
 </html>
