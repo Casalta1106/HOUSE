@@ -458,6 +458,33 @@
   .pattern-alert-text { font-size: 12px; line-height: 1.5; color: var(--text2); }
   .pattern-alert-text strong { color: var(--orange); }
 
+  /* ── NOTIFICAÇÕES ── */
+  .notif-card { background: var(--bg3); border-radius: 12px; padding: 13px; margin-bottom: 10px; }
+  .notif-toggle-row { display: flex; align-items: center; justify-content: space-between; }
+  .notif-label { font-size: 13px; font-weight: 600; color: var(--text); }
+  .notif-sub { font-size: 10px; color: var(--text3); font-family: 'DM Mono', monospace; margin-top: 2px; }
+  .toggle-switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--bg2); border: 1px solid var(--border2); border-radius: 99px; transition: 0.2s; }
+  .toggle-slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px; background: var(--text3); border-radius: 50%; transition: 0.2s; }
+  input:checked + .toggle-slider { background: var(--pill-bg); border-color: var(--pill-border); }
+  input:checked + .toggle-slider::before { transform: translateX(20px); background: var(--accent); }
+  .widget-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 1200; opacity: 0; pointer-events: none; transition: opacity 0.2s; display: flex; align-items: flex-end; }
+  .widget-overlay.open { opacity: 1; pointer-events: all; }
+  .widget-sheet { background: var(--bg2); border: 1px solid var(--border2); border-radius: 20px 20px 0 0; padding: 20px 18px 30px; width: 100%; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); padding-bottom: max(30px, env(safe-area-inset-bottom)); }
+  .widget-overlay.open .widget-sheet { transform: translateY(0); }
+  .widget-kpi-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .widget-kpi { background: var(--bg3); border-radius: 12px; padding: 12px; text-align: center; }
+  .widget-kpi-val { font-size: 16px; font-weight: 800; font-family: 'DM Mono', monospace; }
+  .widget-kpi-label { font-size: 9px; color: var(--text3); font-family: 'DM Mono', monospace; text-transform: uppercase; margin-top: 3px; }
+  .widget-next-title { font-size: 9px; color: var(--text3); font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .widget-next-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .widget-next-item:last-child { border-bottom: none; }
+  .subcat-tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 9px; font-family: 'DM Mono', monospace; background: rgba(91,156,246,0.12); color: var(--blue); margin-top: 1px; }
+  .obs-icon { font-size: 11px; cursor: pointer; opacity: 0.7; }
+  .comprovante-thumb { width: 100%; max-height: 120px; object-fit: cover; border-radius: 8px; margin-top: 8px; border: 1px solid var(--border2); }
+  .comprovante-placeholder { width: 100%; height: 80px; border: 1px dashed var(--border2); border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text3); font-size: 12px; cursor: pointer; margin-top: 6px; background: var(--bg3); }
+
   /* ── PWA INSTALL ── */
   .pwa-card { background: var(--bg3); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
   .pwa-steps { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
@@ -467,6 +494,7 @@
   .pwa-install-btn:active { background: var(--accent2); transform: scale(0.98); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -715,6 +743,31 @@
     </div>
   </div>
 
+  <!-- PAGE: NOTIFICAÇÕES -->
+  <div class="page" id="page-notificacoes">
+    <div class="sec-title">🔔 Notificações</div>
+    <div class="card">
+      <div class="card-title">alertas de vencimento</div>
+      <div class="notif-card">
+        <div class="notif-toggle-row">
+          <div>
+            <div class="notif-label">Notificações de vencimento</div>
+            <div class="notif-sub">Avisar 1 dia antes da conta vencer</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="notifToggle" onchange="toggleNotificacoes(this)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div id="notifStatusMsg" style="font-size:11px;font-family:'DM Mono',monospace;color:var(--text3);margin-top:8px;line-height:1.6"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">contas com vencimento próximo</div>
+      <div id="notifProxList"></div>
+    </div>
+  </div>
+
   <!-- PAGE: PERSONALIZAR -->
   <div class="page" id="page-personalizar">
     <div class="sec-title">Personalizar</div>
@@ -775,13 +828,30 @@
   <button class="more-menu-item" onclick="setPage('reserva');closeMoreMenu()"><span>🛡️</span> Reserva</button>
   <button class="more-menu-item" onclick="setPage('patrimonio');closeMoreMenu()"><span>📈</span> Patrimônio</button>
   <button class="more-menu-item" onclick="setPage('personalizar');closeMoreMenu()"><span>🎨</span> Personalizar</button>
+  <button class="more-menu-item" onclick="setPage('notificacoes');closeMoreMenu()"><span>🔔</span> Notificações</button>
   <button class="more-menu-item" onclick="setPage('importar');closeMoreMenu()"><span>📥</span> Importar CSV</button>
   <div style="height:1px;background:var(--border);margin:4px 0"></div>
   <button class="more-menu-item" onclick="exportCSV();closeMoreMenu()"><span>📤</span> Exportar CSV</button>
+  <button class="more-menu-item" onclick="exportXLSX();closeMoreMenu()"><span>📊</span> Exportar Excel</button>
   <button class="more-menu-item" onclick="gerarPDF();closeMoreMenu()"><span>📄</span> Relatório PDF</button>
+  <button class="more-menu-item" onclick="gerarPDFAnual();closeMoreMenu()"><span>📋</span> PDF Anual</button>
+  <button class="more-menu-item" onclick="openWidget();closeMoreMenu()"><span>⚡</span> Resumo Rápido</button>
   <button class="more-menu-item" onclick="openBackup();closeMoreMenu()"><span>☁</span> Backup</button>
 </div>
 <div id="moreMenuBg" style="display:none;position:fixed;inset:0;z-index:299" onclick="closeMoreMenu()"></div>
+
+<!-- WIDGET RESUMO RÁPIDO -->
+<div class="widget-overlay" id="widgetOverlay" onclick="widgetCloseIfOut(event)">
+  <div class="widget-sheet">
+    <div class="modal-handle"></div>
+    <div style="font-size:17px;font-weight:700;margin-bottom:4px">⚡ Resumo Rápido</div>
+    <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;margin-bottom:16px" id="widgetMesTit"></div>
+    <div class="widget-kpi-row" id="widgetKpis"></div>
+    <div class="widget-next-title">📆 próximas contas</div>
+    <div id="widgetNextList"></div>
+    <button class="btn-full" style="margin-top:14px" onclick="closeWidget()">Fechar</button>
+  </div>
+</div>
 
 <!-- MODAL LANÇAMENTO -->
 <div class="overlay" id="overlay" onclick="closeIfOut(event)">
@@ -866,8 +936,21 @@
         <input type="date" id="fData" />
       </div>
       <div class="form-group">
+        <label>Subcategoria (opcional)</label>
+        <input type="text" id="fSubcat" placeholder="Ex: Restaurante, Mercado, Streaming..." />
+      </div>
+      <div class="form-group">
         <label>Observação</label>
         <textarea id="fObs" rows="2" placeholder="Observações..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>📸 Comprovante (foto)</label>
+        <div class="comprovante-placeholder" id="comprovanteArea" onclick="document.getElementById('comprovanteInput').click()">
+          <span>📷</span><span>Toque para anexar comprovante</span>
+        </div>
+        <input type="file" id="comprovanteInput" accept="image/*" capture="environment" style="display:none" onchange="comprovanteCarregar(event)"/>
+        <img id="comprovantePreview" class="comprovante-thumb" style="display:none" />
+        <button id="comprovanteRemoverBtn" onclick="comprovanteRemover()" style="display:none;margin-top:6px;background:transparent;border:1px solid rgba(255,95,95,0.3);color:var(--red);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:'Syne',sans-serif;width:100%;">🗑 Remover foto</button>
       </div>
     </div>
     <div class="modal-footer">
@@ -1106,7 +1189,7 @@ function setPage(p) {
   const ni = document.getElementById('nav-'+p);
   if (ni) ni.classList.add('active');
   else {
-    const morePages = ['salario','orcamento','categorias','importar','planejamento','calendario','reserva','patrimonio','personalizar'];
+    const morePages = ['salario','orcamento','categorias','importar','planejamento','calendario','reserva','patrimonio','personalizar','notificacoes'];
     if (morePages.includes(p)) document.getElementById('nav-more').classList.add('active');
   }
   render();
@@ -1137,6 +1220,7 @@ function render() {
   else if (activePage==='reserva') { renderReserva(); }
   else if (activePage==='patrimonio') { renderPatrimonio(); }
   else if (activePage==='personalizar') { renderPersonalizar(); }
+  else if (activePage==='notificacoes') { renderNotificacoes(); }
   rebuildCatOptions();
 }
 
@@ -1228,6 +1312,9 @@ function renderLanceItem(l) {
   const catEmoji = catObj ? catObj.emoji+' ' : '';
   const parcelaInfo = l.parcelas>1 ? `<div class="parcela-info">📦 parcela ${l.parcelaAtual||1}/${l.parcelas}</div>` : '';
   const destInfo = l.dest ? `<div class="dest-tag">→ ${l.dest}</div>` : '';
+  const subcatInfo = l.subcat ? `<span class="subcat-tag">${l.subcat}</span>` : '';
+  const obsIcon = l.obs ? `<span class="obs-icon" title="${l.obs.replace(/"/g,'')}" onclick="event.stopPropagation();toast('📝 '+${JSON.stringify(l.obs.slice(0,80))},'')">📝</span>` : '';
+  const comprovanteBtn = l.comprovante ? `<button class="act-btn" onclick="event.stopPropagation();verComprovante(${l.id})" style="color:var(--blue);border-color:rgba(91,156,246,0.3)">📸 Ver</button>` : '';
   const isBatchItem = batchMode && l.status==='pendente';
   const isChecked = batchSelected.has(l.id);
   return `<div class="lance-item ${isChecked?'batch-selected':''}" id="li-${l.id}" onclick="${isBatchItem?`toggleBatchItem(${l.id})`:`toggleItem(${l.id})`}">
@@ -1235,8 +1322,8 @@ function renderLanceItem(l) {
     <div class="lance-left">
       <div class="lance-dot" style="background:${dotColor}"></div>
       <div class="lance-info">
-        <div class="lance-name">${catEmoji}${l.desc}${l.recorrente?' ↻':''}</div>
-        <div class="lance-cat">${l.cat} · <span class="badge ${l.tipo==='fixo'?'badge-fixo':l.tipo==='entrada'?'badge-ok':'badge-var'}">${l.tipo}</span></div>
+        <div class="lance-name">${catEmoji}${l.desc}${l.recorrente?' ↻':''} ${obsIcon}</div>
+        <div class="lance-cat">${l.cat} · <span class="badge ${l.tipo==='fixo'?'badge-fixo':l.tipo==='entrada'?'badge-ok':'badge-var'}">${l.tipo}</span>${subcatInfo}</div>
         ${parcelaInfo}${destInfo}
       </div>
     </div>
@@ -1248,6 +1335,7 @@ function renderLanceItem(l) {
       ${l.status==='pendente'?`<button class="act-btn pay" onclick="event.stopPropagation();marcarPago(${l.id})">✓ Pagar</button>`:''}
       <button class="act-btn dup" onclick="event.stopPropagation();duplicarLancamento(${l.id})">⧉ Dup.</button>
       <button class="act-btn" onclick="event.stopPropagation();editarLancamento(${l.id})">✎ Editar</button>
+      ${comprovanteBtn}
       <button class="act-btn del" onclick="event.stopPropagation();deletarLancamento(${l.id})">✕ Excluir</button>
     </div>
   </div>`;
@@ -1450,6 +1538,9 @@ function openModal(id=null) {
     document.getElementById('fDest').value=l.dest||'';
     document.getElementById('fParcelas').value=l.parcelas||0;
     document.getElementById('fRecorrente').value=l.recorrente?'1':'0';
+    document.getElementById('fSubcat').value=l.subcat||'';
+    comprovanteAtual = l.comprovante||null;
+    comprovanteAtualizarPreview();
   } else {
     document.getElementById('fDesc').value='';
     document.getElementById('fValor').value='';
@@ -1463,6 +1554,9 @@ function openModal(id=null) {
     document.getElementById('fDest').value='';
     document.getElementById('fParcelas').value=0;
     document.getElementById('fRecorrente').value='0';
+    document.getElementById('fSubcat').value='';
+    comprovanteAtual = null;
+    comprovanteAtualizarPreview();
   }
   document.getElementById('overlay').classList.add('open');
   setTimeout(()=>document.getElementById('fDesc').focus(),350);
@@ -1492,6 +1586,8 @@ function salvarLancamento() {
     recorrente: document.getElementById('fRecorrente').value==='1',
     parcelas: parcelas>1?parcelas:0,
     parcelaAtual: 1,
+    subcat: document.getElementById('fSubcat').value.trim(),
+    comprovante: comprovanteAtual||null,
   };
   if (editId) { const idx=state.lancamentos.findIndex(l=>l.id===editId); state.lancamentos[idx]={...state.lancamentos[idx],...obj}; toast('Atualizado','success'); }
   else {
@@ -1820,7 +1916,7 @@ function toggleMoreMenu() {
 function closeMoreMenu() {
   document.getElementById('moreMenu').style.display='none';
   document.getElementById('moreMenuBg').style.display='none';
-  const morePages=['salario','orcamento','categorias','importar','planejamento','calendario','reserva','patrimonio','personalizar'];
+  const morePages=['salario','orcamento','categorias','importar','planejamento','calendario','reserva','patrimonio','personalizar','notificacoes'];
   if(!morePages.includes(activePage)) document.getElementById('nav-more').classList.remove('active');
 }
 
@@ -2152,7 +2248,7 @@ function renderPersonalizar() {
   } catch(e){}
 }
 
-// ── RELATÓRIO PDF (ideia 22) ──
+// ── RELATÓRIO PDF (com Web Share API) ──
 async function gerarPDF() {
   toast('Gerando PDF...','');
   await new Promise(r=>setTimeout(r,100));
@@ -2164,190 +2260,276 @@ async function gerarPDF() {
     const pend = state.lancamentos.filter(l=>l.mes===mesSel&&l.status==='pendente'&&l.tipo!=='entrada').reduce((s,l)=>s+parseFloat(l.valor||0),0);
     const lancamentos = state.lancamentos.filter(l=>l.mes===mesSel);
     const score = calcScore(mesSel);
-
-    // ── Fundo e cabeçalho ──
-    doc.setFillColor(14,15,17);
-    doc.rect(0,0,W,297,'F');
-
-    // Header bar
-    doc.setFillColor(200,240,96);
-    doc.roundedRect(PX, 12, W-PX*2, 22, 3, 3, 'F');
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(16);
-    doc.setTextColor(0,0,0);
-    doc.text('HOUSE 2026', PX+6, 26);
-    doc.setFontSize(9);
-    doc.setFont('helvetica','normal');
-    doc.text(`Relatório mensal — ${MESES_NOMES[mesSel].toUpperCase()} 2026`, PX+6, 32);
-    doc.setFontSize(8);
-    doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')}`, W-PX, 32, {align:'right'});
-
+    doc.setFillColor(14,15,17); doc.rect(0,0,W,297,'F');
+    doc.setFillColor(200,240,96); doc.roundedRect(PX, 12, W-PX*2, 22, 3, 3, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(0,0,0); doc.text('HOUSE 2026', PX+6, 26);
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.text(`Relatório mensal — ${MESES_NOMES[mesSel].toUpperCase()} 2026`, PX+6, 32);
+    doc.setFontSize(8); doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')}`, W-PX, 32, {align:'right'});
     let y = 44;
-
-    // ── KPIs ──
-    const kpis = [
-      {label:'Salário líquido', val:fmt(liq), color:[91,156,246]},
-      {label:'Total gastos', val:fmt(gastos), color:[255,95,95]},
-      {label:'Saldo', val:fmt(saldo), color: saldo>=0?[62,207,142]:[255,95,95]},
-      {label:'Pendente', val:fmt(pend), color:[255,154,60]},
-    ];
+    const kpis = [{label:'Salário líquido',val:fmt(liq),color:[91,156,246]},{label:'Total gastos',val:fmt(gastos),color:[255,95,95]},{label:'Saldo',val:fmt(saldo),color:saldo>=0?[62,207,142]:[255,95,95]},{label:'Pendente',val:fmt(pend),color:[255,154,60]}];
     const kW = (W-PX*2-9)/4;
-    kpis.forEach((k,i)=>{
-      const x = PX + i*(kW+3);
-      doc.setFillColor(30,33,39);
-      doc.roundedRect(x, y, kW, 18, 2, 2, 'F');
-      doc.setFillColor(...k.color);
-      doc.circle(x+4, y+4, 1.5, 'F');
-      doc.setFontSize(7);
-      doc.setTextColor(155,152,147);
-      doc.setFont('helvetica','normal');
-      doc.text(k.label, x+4, y+10);
-      doc.setFontSize(9);
-      doc.setTextColor(240,237,232);
-      doc.setFont('helvetica','bold');
-      doc.text(k.val, x+4, y+16);
-    });
-    y += 24;
-
-    // ── Score ──
-    if (score) {
-      doc.setFillColor(30,33,39);
-      doc.roundedRect(PX, y, W-PX*2, 14, 2, 2, 'F');
-      doc.setFontSize(8);
-      doc.setTextColor(155,152,147);
-      doc.setFont('helvetica','normal');
-      doc.text('Score financeiro do mês:', PX+4, y+6);
-      const sc = score.total;
-      const scColor = sc>=70?[62,207,142]:sc>=45?[255,154,60]:[255,95,95];
-      doc.setFont('helvetica','bold');
-      doc.setTextColor(...scColor);
-      doc.setFontSize(11);
-      doc.text(`${sc}/100`, PX+55, y+6);
-      const grade = sc>=85?'Excelente':sc>=70?'Muito bom':sc>=55?'Bom':sc>=40?'Regular':'Atenção';
-      doc.setFontSize(8);
-      doc.text(grade, PX+75, y+6);
-      // Score bar
-      const barX = PX+4, barY = y+9, barW = W-PX*2-8, barH = 3;
-      doc.setFillColor(22,24,28);
-      doc.roundedRect(barX, barY, barW, barH, 1, 1, 'F');
-      doc.setFillColor(...scColor);
-      doc.roundedRect(barX, barY, barW*(sc/100), barH, 1, 1, 'F');
-      y += 20;
-    }
-
-    // ── Gastos por categoria ──
-    const porCat = {};
-    lancamentos.filter(l=>l.tipo!=='entrada').forEach(l=>{porCat[l.cat]=(porCat[l.cat]||0)+parseFloat(l.valor||0);});
-    const cats = Object.entries(porCat).sort((a,b)=>b[1]-a[1]);
-    if (cats.length) {
-      doc.setFontSize(8);
-      doc.setTextColor(200,240,96);
-      doc.setFont('helvetica','bold');
-      doc.text('GASTOS POR CATEGORIA', PX, y+5);
-      y += 8;
-      const catColors = [[91,156,246],[200,240,96],[255,154,60],[62,207,142],[255,95,95],[167,139,250],[244,114,182],[52,211,153],[155,152,147],[90,88,85]];
-      const maxVal = cats[0]?.[1]||1;
-      cats.slice(0,8).forEach(([cat,val],i)=>{
-        const pct = val/maxVal;
-        const bW = (W-PX*2-40)*pct;
-        doc.setFillColor(30,33,39);
-        doc.roundedRect(PX, y, W-PX*2, 7, 1, 1, 'F');
-        doc.setFillColor(...(catColors[i%catColors.length]));
-        doc.roundedRect(PX+28, y+2, Math.max(2,bW), 3, 1, 1, 'F');
-        doc.setFontSize(7);
-        doc.setTextColor(155,152,147);
-        doc.setFont('helvetica','normal');
-        doc.text(cat.slice(0,14), PX+2, y+5);
-        doc.setTextColor(240,237,232);
-        doc.setFont('helvetica','bold');
-        doc.text(fmt(val), W-PX, y+5, {align:'right'});
-        y += 8;
-      });
-      y += 4;
-    }
-
-    // ── Top 5 gastos ──
-    const top5 = lancamentos.filter(l=>l.tipo!=='entrada').sort((a,b)=>parseFloat(b.valor)-parseFloat(a.valor)).slice(0,5);
-    if (top5.length) {
-      doc.setFontSize(8);
-      doc.setTextColor(200,240,96);
-      doc.setFont('helvetica','bold');
-      doc.text('TOP 5 MAIORES GASTOS', PX, y+5);
-      y += 8;
-      top5.forEach((l,i)=>{
-        doc.setFillColor(30,33,39);
-        doc.roundedRect(PX, y, W-PX*2, 8, 1, 1, 'F');
-        const medals=['🥇','🥈','🥉','4','5'];
-        doc.setFontSize(7);
-        doc.setTextColor(155,152,147);
-        doc.setFont('helvetica','normal');
-        doc.text(`${i+1}.`, PX+2, y+5.5);
-        doc.setTextColor(240,237,232);
-        doc.text(l.desc.slice(0,30), PX+8, y+5.5);
-        doc.setTextColor(255,95,95);
-        doc.setFont('helvetica','bold');
-        doc.text(fmt(l.valor), W-PX, y+5.5, {align:'right'});
-        y += 9;
-      });
-      y += 4;
-    }
-
-    // ── Lista de lançamentos ──
-    if (y < 220) {
-      doc.setFontSize(8);
-      doc.setTextColor(200,240,96);
-      doc.setFont('helvetica','bold');
-      doc.text('LANÇAMENTOS DO MÊS', PX, y+5);
-      y += 8;
-
-      // Cabeçalho tabela
-      doc.setFillColor(30,33,39);
-      doc.rect(PX, y, W-PX*2, 6, 'F');
-      doc.setFontSize(6.5);
-      doc.setTextColor(90,88,85);
-      doc.setFont('helvetica','bold');
-      doc.text('DESCRIÇÃO', PX+2, y+4.5);
-      doc.text('CATEGORIA', PX+62, y+4.5);
-      doc.text('TIPO', PX+95, y+4.5);
-      doc.text('STATUS', PX+115, y+4.5);
-      doc.text('VALOR', W-PX, y+4.5, {align:'right'});
-      y += 7;
-
-      lancamentos.sort((a,b)=>a.tipo.localeCompare(b.tipo)).forEach(l=>{
-        if (y>270) return;
-        doc.setFillColor(22,24,28);
-        doc.rect(PX, y, W-PX*2, 6, 'F');
-        doc.setFontSize(6.5);
-        const isPago = l.status==='pago';
-        doc.setTextColor(isPago?90:200, isPago?88:237, isPago?85:232);
-        doc.setFont('helvetica', isPago?'normal':'normal');
-        doc.text(l.desc.slice(0,28), PX+2, y+4.5);
-        doc.setTextColor(90,88,85);
-        doc.text((l.cat||'').slice(0,16), PX+62, y+4.5);
-        doc.text(l.tipo||'', PX+95, y+4.5);
-        if (isPago) { doc.setTextColor(62,207,142); doc.text('pago', PX+115, y+4.5); }
-        else { doc.setTextColor(255,154,60); doc.text('pendente', PX+115, y+4.5); }
-        const valColor = l.tipo==='entrada'?[62,207,142]:[255,95,95];
-        doc.setTextColor(...valColor);
-        doc.setFont('helvetica','bold');
-        doc.text(fmt(l.valor), W-PX, y+4.5, {align:'right'});
-        y += 7;
-      });
-    }
-
-    // ── Rodapé ──
-    doc.setFontSize(7);
-    doc.setTextColor(60,62,65);
-    doc.text('House 2026 — Controle financeiro pessoal', PX, 292);
-    doc.text(`Página 1`, W-PX, 292, {align:'right'});
-
-    doc.save(`house2026_${MESES_NOMES[mesSel].toLowerCase()}.pdf`);
+    kpis.forEach((k,i)=>{ const x=PX+i*(kW+3); doc.setFillColor(30,33,39); doc.roundedRect(x,y,kW,18,2,2,'F'); doc.setFillColor(...k.color); doc.circle(x+4,y+4,1.5,'F'); doc.setFontSize(7); doc.setTextColor(155,152,147); doc.setFont('helvetica','normal'); doc.text(k.label,x+4,y+10); doc.setFontSize(9); doc.setTextColor(240,237,232); doc.setFont('helvetica','bold'); doc.text(k.val,x+4,y+16); });
+    y+=24;
+    if (score) { doc.setFillColor(30,33,39); doc.roundedRect(PX,y,W-PX*2,14,2,2,'F'); doc.setFontSize(8); doc.setTextColor(155,152,147); doc.setFont('helvetica','normal'); doc.text('Score financeiro do mês:',PX+4,y+6); const sc=score.total; const scColor=sc>=70?[62,207,142]:sc>=45?[255,154,60]:[255,95,95]; doc.setFont('helvetica','bold'); doc.setTextColor(...scColor); doc.setFontSize(11); doc.text(`${sc}/100`,PX+55,y+6); const grade=sc>=85?'Excelente':sc>=70?'Muito bom':sc>=55?'Bom':sc>=40?'Regular':'Atenção'; doc.setFontSize(8); doc.text(grade,PX+75,y+6); const barX=PX+4,barY=y+9,barW=W-PX*2-8,barH=3; doc.setFillColor(22,24,28); doc.roundedRect(barX,barY,barW,barH,1,1,'F'); doc.setFillColor(...scColor); doc.roundedRect(barX,barY,barW*(sc/100),barH,1,1,'F'); y+=20; }
+    const porCat={}; lancamentos.filter(l=>l.tipo!=='entrada').forEach(l=>{porCat[l.cat]=(porCat[l.cat]||0)+parseFloat(l.valor||0);}); const cats=Object.entries(porCat).sort((a,b)=>b[1]-a[1]);
+    if (cats.length) { doc.setFontSize(8); doc.setTextColor(200,240,96); doc.setFont('helvetica','bold'); doc.text('GASTOS POR CATEGORIA',PX,y+5); y+=8; const catColors=[[91,156,246],[200,240,96],[255,154,60],[62,207,142],[255,95,95],[167,139,250],[244,114,182],[52,211,153],[155,152,147],[90,88,85]]; const maxVal=cats[0]?.[1]||1; cats.slice(0,8).forEach(([cat,val],i)=>{ const pct=val/maxVal; const bW=(W-PX*2-40)*pct; doc.setFillColor(30,33,39); doc.roundedRect(PX,y,W-PX*2,7,1,1,'F'); doc.setFillColor(...catColors[i%catColors.length]); doc.roundedRect(PX+28,y+2,Math.max(2,bW),3,1,1,'F'); doc.setFontSize(7); doc.setTextColor(155,152,147); doc.setFont('helvetica','normal'); doc.text(cat.slice(0,14),PX+2,y+5); doc.setTextColor(240,237,232); doc.setFont('helvetica','bold'); doc.text(fmt(val),W-PX,y+5,{align:'right'}); y+=8; }); y+=4; }
+    const top5=lancamentos.filter(l=>l.tipo!=='entrada').sort((a,b)=>parseFloat(b.valor)-parseFloat(a.valor)).slice(0,5);
+    if (top5.length) { doc.setFontSize(8); doc.setTextColor(200,240,96); doc.setFont('helvetica','bold'); doc.text('TOP 5 MAIORES GASTOS',PX,y+5); y+=8; top5.forEach((l,i)=>{ doc.setFillColor(30,33,39); doc.roundedRect(PX,y,W-PX*2,8,1,1,'F'); doc.setFontSize(7); doc.setTextColor(155,152,147); doc.setFont('helvetica','normal'); doc.text(`${i+1}.`,PX+2,y+5.5); doc.setTextColor(240,237,232); doc.text(l.desc.slice(0,30),PX+8,y+5.5); doc.setTextColor(255,95,95); doc.setFont('helvetica','bold'); doc.text(fmt(l.valor),W-PX,y+5.5,{align:'right'}); y+=9; }); y+=4; }
+    if (y<220) { doc.setFontSize(8); doc.setTextColor(200,240,96); doc.setFont('helvetica','bold'); doc.text('LANÇAMENTOS DO MÊS',PX,y+5); y+=8; doc.setFillColor(30,33,39); doc.rect(PX,y,W-PX*2,6,'F'); doc.setFontSize(6.5); doc.setTextColor(90,88,85); doc.setFont('helvetica','bold'); doc.text('DESCRIÇÃO',PX+2,y+4.5); doc.text('CATEGORIA',PX+62,y+4.5); doc.text('TIPO',PX+95,y+4.5); doc.text('STATUS',PX+115,y+4.5); doc.text('VALOR',W-PX,y+4.5,{align:'right'}); y+=7; lancamentos.sort((a,b)=>a.tipo.localeCompare(b.tipo)).forEach(l=>{ if(y>270)return; doc.setFillColor(22,24,28); doc.rect(PX,y,W-PX*2,6,'F'); doc.setFontSize(6.5); const isPago=l.status==='pago'; doc.setTextColor(isPago?90:200,isPago?88:237,isPago?85:232); doc.setFont('helvetica','normal'); doc.text(l.desc.slice(0,28),PX+2,y+4.5); doc.setTextColor(90,88,85); doc.text((l.cat||'').slice(0,16),PX+62,y+4.5); doc.text(l.tipo||'',PX+95,y+4.5); if(isPago){doc.setTextColor(62,207,142);doc.text('pago',PX+115,y+4.5);}else{doc.setTextColor(255,154,60);doc.text('pendente',PX+115,y+4.5);} const valColor=l.tipo==='entrada'?[62,207,142]:[255,95,95]; doc.setTextColor(...valColor); doc.setFont('helvetica','bold'); doc.text(fmt(l.valor),W-PX,y+4.5,{align:'right'}); y+=7; }); }
+    doc.setFontSize(7); doc.setTextColor(60,62,65); doc.text('House 2026 — Controle financeiro pessoal',PX,292); doc.text(`Página 1`,W-PX,292,{align:'right'});
+    const fileName=`house2026_${MESES_NOMES[mesSel].toLowerCase()}.pdf`; const blob=doc.output('blob');
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([blob],fileName,{type:'application/pdf'})]})){await navigator.share({files:[new File([blob],fileName,{type:'application/pdf'})],title:'Relatório House 2026'});}else{const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=fileName;a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);}
     toast('PDF gerado ✓','success');
-  } catch(e) {
-    console.error(e);
-    toast('Erro ao gerar PDF','error');
+  } catch(e){console.error(e);toast('Erro ao gerar PDF','error');}
+}
+
+// ── RELATÓRIO PDF ANUAL ──
+async function gerarPDFAnual() {
+  toast('Gerando PDF anual...','');
+  await new Promise(r=>setTimeout(r,100));
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+    const W=210,PX=14;
+    doc.setFillColor(14,15,17); doc.rect(0,0,W,297,'F');
+    doc.setFillColor(200,240,96); doc.roundedRect(PX,12,W-PX*2,22,3,3,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(0,0,0); doc.text('HOUSE 2026',PX+6,26);
+    doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.text('Relatório Anual — 2026',PX+6,32);
+    doc.setFontSize(8); doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')}`,W-PX,32,{align:'right'});
+    let y=44;
+    const totalAnualGastos=Array.from({length:12},(_,i)=>getTotalGastos(i)).reduce((s,v)=>s+v,0);
+    const totalAnualEntradas=Array.from({length:12},(_,i)=>getLiqMes(i)+getTotalEntradas(i)).reduce((s,v)=>s+v,0);
+    const saldoAnual=totalAnualEntradas-totalAnualGastos;
+    doc.setFillColor(30,33,39); doc.roundedRect(PX,y,W-PX*2,16,2,2,'F');
+    doc.setFontSize(8); doc.setTextColor(155,152,147); doc.text('TOTAL ENTRADAS 2026:',PX+4,y+6); doc.setTextColor(62,207,142); doc.setFont('helvetica','bold'); doc.text(fmt(totalAnualEntradas),PX+55,y+6);
+    doc.setFont('helvetica','normal'); doc.setTextColor(155,152,147); doc.text('TOTAL GASTOS:',PX+100,y+6); doc.setTextColor(255,95,95); doc.setFont('helvetica','bold'); doc.text(fmt(totalAnualGastos),PX+128,y+6);
+    doc.setFont('helvetica','normal'); doc.setTextColor(155,152,147); doc.text('SALDO ANUAL:',PX+4,y+13); doc.setTextColor(...(saldoAnual>=0?[62,207,142]:[255,95,95])); doc.setFont('helvetica','bold'); doc.text(fmt(saldoAnual),PX+40,y+13); y+=22;
+    doc.setFontSize(8); doc.setTextColor(200,240,96); doc.setFont('helvetica','bold'); doc.text('RESUMO MENSAL',PX,y+5); y+=8;
+    doc.setFillColor(30,33,39); doc.rect(PX,y,W-PX*2,7,'F'); doc.setFontSize(7); doc.setTextColor(90,88,85); doc.setFont('helvetica','bold'); const cw=(W-PX*2)/5;
+    doc.text('MÊS',PX+2,y+5); doc.text('ENTRADAS',PX+cw,y+5); doc.text('GASTOS',PX+cw*2,y+5); doc.text('SALDO',PX+cw*3,y+5); doc.text('SCORE',PX+cw*4,y+5); y+=8;
+    for(let m=0;m<12;m++){const liq=getLiqMes(m)+getTotalEntradas(m),gastos=getTotalGastos(m),saldo=getSaldo(m),sc=calcScore(m); const temDados=liq>0||gastos>0; doc.setFillColor(temDados?22:18,temDados?24:20,temDados?28:24); doc.rect(PX,y,W-PX*2,7,'F'); doc.setFontSize(7); doc.setTextColor(temDados?200:90,temDados?237:88,temDados?232:85); doc.setFont('helvetica',temDados?'bold':'normal'); doc.text(MESES_NOMES[m].slice(0,3).toUpperCase(),PX+2,y+5); doc.setTextColor(62,207,142); doc.text(temDados?fmt(liq):'—',PX+cw,y+5); doc.setTextColor(255,95,95); doc.text(temDados?fmt(gastos):'—',PX+cw*2,y+5); const sc2=saldo>=0?[62,207,142]:[255,95,95]; doc.setTextColor(...sc2); doc.text(temDados?fmt(saldo):'—',PX+cw*3,y+5); if(sc){const sc3=sc.total>=70?[62,207,142]:sc.total>=45?[255,154,60]:[255,95,95];doc.setTextColor(...sc3);doc.text(sc.total+'/100',PX+cw*4,y+5);}else{doc.setTextColor(90,88,85);doc.text('—',PX+cw*4,y+5);} y+=8;}
+    y+=6;
+    if(y<240){const porCatAnual={};state.lancamentos.filter(l=>l.tipo!=='entrada').forEach(l=>{porCatAnual[l.cat]=(porCatAnual[l.cat]||0)+parseFloat(l.valor||0);});const topCats=Object.entries(porCatAnual).sort((a,b)=>b[1]-a[1]).slice(0,6);if(topCats.length){doc.setFontSize(8);doc.setTextColor(200,240,96);doc.setFont('helvetica','bold');doc.text('TOP CATEGORIAS DO ANO',PX,y+5);y+=8;const maxC=topCats[0][1];const catColors=[[91,156,246],[255,154,60],[200,240,96],[62,207,142],[255,95,95],[167,139,250]];topCats.forEach(([cat,val],i)=>{const bW=(W-PX*2-50)*(val/maxC);doc.setFillColor(30,33,39);doc.roundedRect(PX,y,W-PX*2,7,1,1,'F');doc.setFillColor(...catColors[i]);doc.roundedRect(PX+35,y+2,Math.max(2,bW),3,1,1,'F');doc.setFontSize(7);doc.setTextColor(155,152,147);doc.setFont('helvetica','normal');doc.text(cat.slice(0,16),PX+2,y+5);doc.setTextColor(240,237,232);doc.setFont('helvetica','bold');doc.text(fmt(val),W-PX,y+5,{align:'right'});y+=8;});}}
+    doc.setFontSize(7); doc.setTextColor(60,62,65); doc.text('House 2026 — Controle financeiro pessoal',PX,292); doc.text(`Relatório Anual`,W-PX,292,{align:'right'});
+    const fileName='house2026_anual.pdf'; const blob=doc.output('blob');
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([blob],fileName,{type:'application/pdf'})]})){await navigator.share({files:[new File([blob],fileName,{type:'application/pdf'})],title:'Relatório Anual House 2026'});}else{const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=fileName;a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);}
+    toast('PDF anual gerado ✓','success');
+  } catch(e){console.error(e);toast('Erro ao gerar PDF anual','error');}
+}
+
+// ── EXPORT EXCEL (XLSX) com SheetJS ──
+function exportXLSX() {
+  if (!window.XLSX) { toast('SheetJS não carregado','error'); return; }
+  toast('Gerando Excel...','');
+  try {
+    const wb = XLSX.utils.book_new();
+    const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+    // ── Aba: Lançamentos ──
+    const lancRows = [['Mês','Descrição','Subcategoria','Categoria','Tipo','Status','Valor (R$)','Vencimento (dia)','Data Pagamento','Recorrente','Parcelas','Conta/Destino','Observação']];
+    state.lancamentos.forEach(l => {
+      lancRows.push([MESES[l.mes], l.desc, l.subcat||'', l.cat, l.tipo, l.status, parseFloat(l.valor||0), l.venc||'', l.data||'', l.recorrente?'Sim':'Não', l.parcelas||0, l.dest||'', l.obs||'']);
+    });
+    const wsLanc = XLSX.utils.aoa_to_sheet(lancRows);
+    wsLanc['!cols'] = [10,22,14,14,10,10,12,12,14,10,8,16,20].map(w=>({wch:w}));
+    // Estilo cabeçalho
+    ['A1','B1','C1','D1','E1','F1','G1','H1','I1','J1','K1','L1','M1'].forEach(ref => {
+      if (wsLanc[ref]) wsLanc[ref].s = {font:{bold:true,color:{rgb:'C8F060'}}, fill:{fgColor:{rgb:'0E0F11'}}, alignment:{horizontal:'center'}};
+    });
+    XLSX.utils.book_append_sheet(wb, wsLanc, '📋 Lançamentos');
+
+    // ── Aba: Resumo Mensal ──
+    const resumoRows = [['Mês','Salário Bruto','Descontos','Salário Líquido','Total Gastos','Entradas Extra','Saldo','Score','Fixos','Variáveis','Extras','Pendente']];
+    for (let m=0; m<12; m++) {
+      const sal = state.salarios[m]||{};
+      const desc=(sal.inss||0)+(sal.assist||0)+(sal.odonto||0)+(sal.outros||0);
+      const liq=(sal.bruto||0)-desc+(sal.decimo||0);
+      const gastos=getTotalGastos(m);
+      const entradas=getTotalEntradas(m);
+      const saldo=getSaldo(m);
+      const sc=calcScore(m);
+      const fixos=state.lancamentos.filter(l=>l.mes===m&&l.tipo==='fixo').reduce((s,l)=>s+parseFloat(l.valor||0),0);
+      const variaveis=state.lancamentos.filter(l=>l.mes===m&&(l.tipo==='variavel'||l.tipo==='extra')).reduce((s,l)=>s+parseFloat(l.valor||0),0);
+      const extras=state.lancamentos.filter(l=>l.mes===m&&l.tipo==='extra').reduce((s,l)=>s+parseFloat(l.valor||0),0);
+      const pend=state.lancamentos.filter(l=>l.mes===m&&l.status==='pendente'&&l.tipo!=='entrada').reduce((s,l)=>s+parseFloat(l.valor||0),0);
+      resumoRows.push([MESES[m],sal.bruto||0,desc,liq,gastos,entradas,saldo,sc?sc.total:'',fixos,variaveis,extras,pend]);
+    }
+    // Linha de totais
+    resumoRows.push(['TOTAL ANUAL','','','=SUM(D2:D13)','=SUM(E2:E13)','=SUM(F2:F13)','=SUM(G2:G13)','','=SUM(I2:I13)','=SUM(J2:J13)','=SUM(K2:K13)','=SUM(L2:L13)']);
+    const wsRes = XLSX.utils.aoa_to_sheet(resumoRows);
+    wsRes['!cols'] = [12,13,12,14,13,14,12,8,12,12,10,12].map(w=>({wch:w}));
+    XLSX.utils.book_append_sheet(wb, wsRes, '📊 Resumo Mensal');
+
+    // ── Aba: Por Categoria ──
+    const catMap = {};
+    state.lancamentos.filter(l=>l.tipo!=='entrada').forEach(l => {
+      if (!catMap[l.cat]) catMap[l.cat] = Array(12).fill(0);
+      catMap[l.cat][l.mes] += parseFloat(l.valor||0);
+    });
+    const catRows = [['Categoria', ...MESES, 'Total Anual', '% do Total']];
+    const totalGeral = Object.values(catMap).flat().reduce((s,v)=>s+v,0);
+    Object.entries(catMap).sort((a,b)=>b[1].reduce((s,v)=>s+v,0)-a[1].reduce((s,v)=>s+v,0)).forEach(([cat, vals]) => {
+      const total = vals.reduce((s,v)=>s+v,0);
+      catRows.push([cat, ...vals, total, totalGeral>0?(total/totalGeral*100).toFixed(1)+'%':'0%']);
+    });
+    catRows.push(['TOTAL', ...Array.from({length:12},(_,i)=>{
+      const col = String.fromCharCode(66+i);
+      return `=SUM(${col}2:${col}${catRows.length})`;
+    }), `=SUM(N2:N${catRows.length})`, '100%']);
+    const wsCat = XLSX.utils.aoa_to_sheet(catRows);
+    wsCat['!cols'] = [{wch:16},...Array(12).fill({wch:10}),{wch:12},{wch:10}];
+    XLSX.utils.book_append_sheet(wb, wsCat, '🏷️ Por Categoria');
+
+    // ── Aba: Metas ──
+    if (state.metas && state.metas.length) {
+      const metaRows = [['Meta','Mês','Valor Alvo (R$)','Valor Atual (R$)','Falta (R$)','% Concluído','Status']];
+      state.metas.forEach(m => {
+        const pct = m.alvo>0?Math.min(100,(m.atual/m.alvo*100)):0;
+        const falta = Math.max(0, m.alvo - m.atual);
+        const status = pct>=100?'Concluída':pct>=60?'Em progresso':'Abaixo';
+        metaRows.push([m.nome, MESES[m.mes]||'', m.alvo, m.atual, falta, pct.toFixed(1)+'%', status]);
+      });
+      const wsMeta = XLSX.utils.aoa_to_sheet(metaRows);
+      wsMeta['!cols'] = [{wch:20},{wch:12},{wch:14},{wch:14},{wch:12},{wch:12},{wch:12}];
+      XLSX.utils.book_append_sheet(wb, wsMeta, '🎯 Metas');
+    }
+
+    // ── Aba: Orçamentos ──
+    if (state.orcamentos && Object.keys(state.orcamentos).length) {
+      const orcRows = [['Categoria','Orçamento (R$)',...MESES.map(m=>`Gasto — ${m.slice(0,3)}`), 'Melhor Mês', 'Pior Mês']];
+      Object.entries(state.orcamentos).forEach(([cat, lim]) => {
+        const gastosPorMes = Array.from({length:12},(_,i)=>state.lancamentos.filter(l=>l.mes===i&&l.cat===cat&&l.tipo!=='entrada').reduce((s,l)=>s+parseFloat(l.valor||0),0));
+        const melhor = MESES[gastosPorMes.reduce((bi,v,i,a)=>v<a[bi]?i:bi,0)];
+        const pior = MESES[gastosPorMes.reduce((bi,v,i,a)=>v>a[bi]?i:bi,0)];
+        orcRows.push([cat, parseFloat(lim), ...gastosPorMes, melhor, pior]);
+      });
+      const wsOrc = XLSX.utils.aoa_to_sheet(orcRows);
+      wsOrc['!cols'] = [{wch:16},{wch:14},...Array(12).fill({wch:10}),{wch:12},{wch:12}];
+      XLSX.utils.book_append_sheet(wb, wsOrc, '📋 Orçamentos');
+    }
+
+    // Exportar
+    const wbOut = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+    const blob = new Blob([wbOut], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const fileName = 'house2026.xlsx';
+    if (navigator.share && navigator.canShare && navigator.canShare({files:[new File([blob],fileName)]})) {
+      navigator.share({files:[new File([blob],fileName,{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})], title:'House 2026 — Planilha'});
+    } else {
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=fileName; a.click(); setTimeout(()=>URL.revokeObjectURL(url),5000);
+    }
+    toast('Excel gerado ✓','success');
+  } catch(e) { console.error(e); toast('Erro ao gerar Excel: '+e.message,'error'); }
+}
+
+// ── COMPROVANTE ──
+let comprovanteAtual = null;
+function comprovanteCarregar(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => { comprovanteAtual = ev.target.result; comprovanteAtualizarPreview(); };
+  reader.readAsDataURL(file);
+}
+function comprovanteAtualizarPreview() {
+  const preview = document.getElementById('comprovantePreview');
+  const removeBtn = document.getElementById('comprovanteRemoverBtn');
+  const area = document.getElementById('comprovanteArea');
+  if (comprovanteAtual) {
+    preview.src = comprovanteAtual; preview.style.display='block';
+    removeBtn.style.display='block'; area.style.display='none';
+  } else {
+    preview.style.display='none'; removeBtn.style.display='none'; area.style.display='flex';
   }
 }
+function comprovanteRemover() { comprovanteAtual=null; comprovanteAtualizarPreview(); document.getElementById('comprovanteInput').value=''; }
+function verComprovante(id) {
+  const l = state.lancamentos.find(x=>x.id===id);
+  if (!l||!l.comprovante) return;
+  const w = window.open('','_blank','width=400,height=600');
+  w.document.write(`<html><body style="margin:0;background:#000"><img src="${l.comprovante}" style="max-width:100%;display:block;margin:auto"></body></html>`);
+}
+
+// ── WIDGET RESUMO RÁPIDO ──
+function openWidget() {
+  const liq=getLiqMes(mesSel), gastos=getTotalGastos(mesSel), saldo=getSaldo(mesSel);
+  const pend=state.lancamentos.filter(l=>l.mes===mesSel&&l.status==='pendente'&&l.tipo!=='entrada').reduce((s,l)=>s+parseFloat(l.valor||0),0);
+  document.getElementById('widgetMesTit').textContent = MESES_NOMES[mesSel]+' 2026';
+  document.getElementById('widgetKpis').innerHTML = `
+    <div class="widget-kpi"><div class="widget-kpi-val" style="color:var(--blue)">${fmtShort(liq)}</div><div class="widget-kpi-label">Salário</div></div>
+    <div class="widget-kpi"><div class="widget-kpi-val" style="color:${saldo>=0?'var(--teal)':'var(--red)'}">${fmtShort(saldo)}</div><div class="widget-kpi-label">Saldo</div></div>
+    <div class="widget-kpi"><div class="widget-kpi-val" style="color:${pend>0?'var(--orange)':'var(--teal)'}">${fmtShort(pend)}</div><div class="widget-kpi-label">Pendente</div></div>`;
+  const hoje = new Date().getDate();
+  const proximas = state.lancamentos.filter(l=>l.mes===mesSel&&l.status==='pendente'&&l.venc&&l.venc>=hoje).sort((a,b)=>a.venc-b.venc).slice(0,5);
+  document.getElementById('widgetNextList').innerHTML = proximas.length ? proximas.map(l=>`
+    <div class="widget-next-item">
+      <div><div style="font-weight:600;color:var(--text)">${l.desc}</div><div style="font-size:10px;font-family:'DM Mono',monospace;color:var(--text3)">${l.cat}</div></div>
+      <div style="text-align:right"><div style="font-family:'DM Mono',monospace;color:var(--red);font-weight:700">${fmt(l.valor)}</div><div style="font-size:10px;color:var(--text3)">dia ${l.venc}</div></div>
+    </div>`).join('') : '<div style="font-size:12px;color:var(--teal);text-align:center;padding:12px">✓ Nenhuma conta pendente</div>';
+  document.getElementById('widgetOverlay').classList.add('open');
+}
+function closeWidget() { document.getElementById('widgetOverlay').classList.remove('open'); }
+function widgetCloseIfOut(e) { if(e.target===document.getElementById('widgetOverlay')) closeWidget(); }
+
+// ── NOTIFICAÇÕES ──
+function renderNotificacoes() {
+  const saved = localStorage.getItem('house2026_notif')==='1';
+  document.getElementById('notifToggle').checked = saved;
+  const hoje = new Date().getDate(), mesAtual = new Date().getMonth();
+  const prox = state.lancamentos.filter(l=>l.mes===mesAtual&&l.status==='pendente'&&l.venc).sort((a,b)=>a.venc-b.venc);
+  document.getElementById('notifProxList').innerHTML = prox.length ? prox.map(l=>{
+    const diasRestantes = l.venc - hoje;
+    const cor = diasRestantes<=1?'var(--red)':diasRestantes<=3?'var(--orange)':'var(--text2)';
+    return `<div class="plan-item"><div class="plan-info"><div class="plan-name">${l.desc}</div><div class="plan-cat">${l.cat} · dia ${l.venc}</div></div><div style="font-size:12px;font-family:'DM Mono',monospace;font-weight:700;color:${cor}">${diasRestantes<0?'vencido':diasRestantes===0?'hoje':diasRestantes===1?'amanhã':diasRestantes+' dias'} · ${fmt(l.valor)}</div></div>`;
+  }).join('') : '<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">Nenhuma conta pendente</div></div>';
+}
+async function toggleNotificacoes(el) {
+  if (el.checked) {
+    if (!('Notification' in window)) { toast('Notificações não suportadas neste navegador','error'); el.checked=false; return; }
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      localStorage.setItem('house2026_notif','1');
+      document.getElementById('notifStatusMsg').textContent = '✓ Notificações ativadas. Você será avisado 1 dia antes das contas vencerem.';
+      agendarNotificacoes();
+      toast('Notificações ativadas ✓','success');
+    } else {
+      el.checked = false; localStorage.removeItem('house2026_notif');
+      document.getElementById('notifStatusMsg').textContent = '❌ Permissão negada. Ative nas configurações do navegador.';
+    }
+  } else {
+    localStorage.removeItem('house2026_notif');
+    document.getElementById('notifStatusMsg').textContent = 'Notificações desativadas.';
+    toast('Notificações desativadas','');
+  }
+}
+function agendarNotificacoes() {
+  if (Notification.permission !== 'granted') return;
+  const hoje = new Date(); const mesAtual = hoje.getMonth(); const diaAtual = hoje.getDate();
+  const amanha = state.lancamentos.filter(l=>l.mes===mesAtual&&l.status==='pendente'&&l.venc===diaAtual+1);
+  amanha.forEach(l=>{
+    try { new Notification('🏠 House 2026', { body:`"${l.desc}" vence amanhã — ${fmt(l.valor)}`, icon:'/favicon.ico' }); } catch(e){}
+  });
+}
+// Verificar notificações ao iniciar
+(function(){
+  if(localStorage.getItem('house2026_notif')==='1' && Notification.permission==='granted') agendarNotificacoes();
+})();
+
+// ── RECORRÊNCIAS AUTOMÁTICAS ao virar mês ──
+(function(){
+  const mesAtual = new Date().getMonth();
+  const ultimoMes = parseInt(localStorage.getItem('house2026_ultimo_mes')??'-1');
+  if (ultimoMes !== mesAtual && ultimoMes >= 0) {
+    const recorrentes = state.lancamentos.filter(l=>l.mes===ultimoMes&&l.recorrente);
+    let novos = 0;
+    recorrentes.forEach(l=>{
+      const jaExiste = state.lancamentos.find(x=>x.desc===l.desc&&x.mes===mesAtual&&x.recorrente);
+      if (!jaExiste) { state.lancamentos.push({...l, id:nextId++, mes:mesAtual, status:'pendente', data:''}); novos++; }
+    });
+    if (novos>0) { saveState(); toast(`${novos} recorrência${novos!==1?'s':''} adicionada${novos!==1?'s':''} automaticamente ✓`,'success'); }
+  }
+  localStorage.setItem('house2026_ultimo_mes', mesAtual);
+})();
+
 let _supabase=null, _bkUser=null, _bkTab='login';
 function bkGetConfig() { try{const c=localStorage.getItem('house2026_sbcfg');return c?JSON.parse(c):null;}catch(e){return null;} }
 function bkSetConfig(url,key) { localStorage.setItem('house2026_sbcfg',JSON.stringify({url,key})); }
